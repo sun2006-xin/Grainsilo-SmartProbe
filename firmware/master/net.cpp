@@ -13,7 +13,6 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <ctype.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -69,43 +68,6 @@ static bool json_integer(const char *json, const char *key, int64_t *out)
     return true;
 }
 
-static bool json_float(const char *json, const char *key, float *out)
-{
-    const char *p = json_value(json, key);
-    if (!p || !out) return false;
-    char *end = NULL;
-    const float value = strtof(p, &end);
-    if (end == p || !isfinite(value) ||
-        (*end != ',' && *end != '}' && !isspace((unsigned char)*end)))
-        return false;
-    *out = value;
-    return true;
-}
-
-static bool json_float_array(const char *json, const char *key,
-                             float *out, size_t count)
-{
-    const char *p = json_value(json, key);
-    if (!p || !out) return false;
-    while (*p && isspace((unsigned char)*p)) ++p;
-    if (*p++ != '[') return false;
-    for (size_t i = 0u; i < count; ++i) {
-        while (*p && isspace((unsigned char)*p)) ++p;
-        char *end = NULL;
-        const float value = strtof(p, &end);
-        if (end == p || !isfinite(value) || fabsf(value) > 10000.0f) return false;
-        out[i] = value;
-        p = end;
-        while (*p && isspace((unsigned char)*p)) ++p;
-        if (i + 1u < count) {
-            if (*p++ != ',') return false;
-        } else if (*p != ']') {
-            return false;
-        }
-    }
-    return true;
-}
-
 static void parse_response_cmd(const char *json, char *out, size_t capacity)
 {
     if (!out || capacity == 0u) return;
@@ -125,33 +87,6 @@ static void parse_remote_settings(const char *json, net_remote_settings_t *setti
 {
     if (!settings) return;
     memset(settings, 0, sizeof(*settings));
-
-    int64_t model_version, validated_mask;
-    if (json_integer(json, "version", &model_version) &&
-        json_integer(json, "validated_mask", &validated_mask) &&
-        model_version > 0 && model_version <= UINT32_MAX &&
-        validated_mask >= 0 && validated_mask <= 0x3F &&
-        json_float_array(json, "parameters", settings->forecast_parameters,
-                         GS_UF_PARAMETER_COUNT)) {
-        settings->forecast_model_present = true;
-        settings->forecast_model_version = (uint32_t)model_version;
-        settings->forecast_validated_mask = (uint8_t)validated_mask;
-    }
-
-    int64_t weather_age;
-    float weather_temperature, weather_rh;
-    if (json_integer(json, "age_seconds", &weather_age) &&
-        json_float(json, "temperature_c", &weather_temperature) &&
-        json_float(json, "rh_pct", &weather_rh) &&
-        weather_age >= 0 && weather_age <= 10800 &&
-        weather_temperature >= -40.0f && weather_temperature <= 125.0f &&
-        weather_rh >= 0.0f && weather_rh <= 100.0f) {
-        settings->forecast_weather_present = true;
-        settings->forecast_weather_age_sec = (uint32_t)weather_age;
-        settings->forecast_weather_temperature_c = weather_temperature;
-        settings->forecast_weather_rh_pct = weather_rh;
-    }
-
     int64_t revision, temp_high, temp_low, rh_high, rh_low, normal_sec, fast_sec;
     if (!json_integer(json, "revision", &revision) ||
         !json_integer(json, "temp_high_centi", &temp_high) ||
@@ -183,6 +118,9 @@ static char  s_host[40] = NET_DEFAULT_HOST;
 static int8_t s_rssi = -127;
 static bool s_setup_ap = false;
 static char s_setup_ap_ssid[33] = {0};
+static bool s_sta_connect_started = false;
+static bool s_sta_connected_once = false;
+static uint32_t s_sta_connect_started_ms = 0u;
 
 static void start_setup_ap(void)
 {
@@ -207,6 +145,9 @@ static void start_setup_ap(void)
 
 void net_init(void)
 {
+    s_sta_connect_started = false;
+    s_sta_connected_once = false;
+    s_sta_connect_started_ms = 0u;
     Preferences p;
     p.begin("gs", true);
     String ssid = p.getString("wifi_ssid", "");
@@ -223,25 +164,65 @@ void net_init(void)
     Serial.printf("[NET] wifi=%s host=%s:%d\n", s_ssid, s_host, NET_PORT);
 }
 
+void net_connect_start(void)
+{
+    if (s_setup_ap || s_ssid[0] == '\0' ||
+        WiFi.status() == WL_CONNECTED || s_sta_connect_started) return;
+
+    s_sta_connect_started = true;
+    s_sta_connect_started_ms = millis();
+    WiFi.begin(s_ssid, s_pass);
+    Serial.println("[NET] asynchronous Wi-Fi association started");
+}
+
+void net_service(void)
+{
+    if (s_setup_ap) return;
+
+    if (WiFi.status() == WL_CONNECTED) {
+        s_sta_connected_once = true;
+        s_rssi = WiFi.RSSI();
+        return;
+    }
+
+    if (s_sta_connected_once) {
+        s_sta_connected_once = false;
+        s_sta_connect_started = false;
+        s_sta_connect_started_ms = 0u;
+    }
+    if (!s_sta_connect_started) net_connect_start();
+    if (s_setup_ap || !s_sta_connect_started ||
+        (uint32_t)(millis() - s_sta_connect_started_ms) < NET_CONN_MS) return;
+
+    Serial.println("[NET] asynchronous Wi-Fi connection timed out; starting setup AP");
+    s_sta_connect_started = false;
+    s_sta_connect_started_ms = 0u;
+    start_setup_ap();
+}
+
 bool net_connect(uint32_t timeoutMs)
 {
     if (s_setup_ap) return false;
     if (WiFi.status() == WL_CONNECTED) {
+        s_sta_connected_once = true;
+        s_rssi = WiFi.RSSI();
         return true;
     }
     Serial.printf("[NET] connecting to %s ...\n", s_ssid);
-    WiFi.begin(s_ssid, s_pass);
+    net_connect_start();
+    if (s_setup_ap) return false;
     uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED &&
+    while (!s_setup_ap && WiFi.status() != WL_CONNECTED &&
            (uint32_t)(millis() - t0) < timeoutMs) {
         delay(100);
     }
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[NET] connect FAILED");
-        start_setup_ap();
+        if (!s_setup_ap) start_setup_ap();
         return false;
     }
     s_rssi = WiFi.RSSI();
+    s_sta_connected_once = true;
     Serial.printf("[NET] connected ip=%s rssi=%d dBm\n",
                   WiFi.localIP().toString().c_str(), s_rssi);
     return true;
@@ -283,6 +264,9 @@ bool net_post_snapshot(const char *body, char *respCmd, size_t respCmdCap,
 void net_disconnect(void)
 {
     WiFi.disconnect(true);
+    s_sta_connect_started = false;
+    s_sta_connected_once = false;
+    s_sta_connect_started_ms = 0u;
     if (s_setup_ap) {
         WiFi.mode(WIFI_AP);
         WiFi.softAP(s_setup_ap_ssid);

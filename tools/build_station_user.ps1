@@ -113,8 +113,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSES\ECharts-d3-3-Clause.txt") 
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs\第三方组件许可证说明.md") -Destination (Join-Path $packageRoot "第三方组件许可证说明.md")
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs\资源来源与外部服务说明.md") -Destination (Join-Path $packageRoot "资源来源与外部服务说明.md")
 
-# Ship the corresponding PC station source with the portable binary. Firmware
-# sources are intentionally excluded because they depend on private AutoLink.
+# Bundle the Windows station source with the portable binary.
 $sourcePackageRoot = Join-Path $packageRoot "SOURCE-CODE"
 $sourceStationRoot = Join-Path $sourcePackageRoot "station"
 $sourceWebRoot = Join-Path $sourceStationRoot "web"

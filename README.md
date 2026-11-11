@@ -9,18 +9,19 @@
   <img alt="MCU: ESP32-S3 and ESP32-C3" src="https://img.shields.io/badge/MCU-ESP32--S3%20%2B%20ESP32--C3-00796B?style=flat-square">
   <img alt="Current prototype sensors: three SHT31 nodes" src="https://img.shields.io/badge/Sensors-3%C3%97%20SHT31%20(current%20prototype)-B88935?style=flat-square">
   <img alt="RS-485 with MAX3485" src="https://img.shields.io/badge/Bus-RS--485%20%2B%20MAX3485-0B5563?style=flat-square">
-  <img alt="AutoLink in-house protocol; full details not public" src="https://img.shields.io/badge/Protocol-AutoLink%20(in--house%2C%20limited%20public%20scope)-496A81?style=flat-square">
+  <img alt="AutoLink v2.2.0" src="https://img.shields.io/badge/Protocol-AutoLink%20v2.2.0-496A81?style=flat-square">
+  <img alt="Apache-2.0" src="https://img.shields.io/badge/License-Apache--2.0-377A68?style=flat-square">
   <img alt="Local station: Python and SQLite" src="https://img.shields.io/badge/Station-Python%20%2B%20SQLite-377A68?style=flat-square">
   <img alt="Web: HTML, CSS, JavaScript" src="https://img.shields.io/badge/Web-HTML%20%2F%20CSS%20%2F%20JavaScript-2D7188?style=flat-square">
   <img alt="Visualization: Three.js and ECharts" src="https://img.shields.io/badge/Visualization-Three.js%20%2B%20ECharts-385C78?style=flat-square">
   <img alt="S3 actively reports over Wi-Fi on the local network" src="https://img.shields.io/badge/Network-Wi--Fi%20LAN%20(active%20upload)-68804D?style=flat-square">
 </p>
 
-> 本仓库公开 GrainSilo 项目源码与用户版电脑中心站。**AutoLink 自研协议暂不开源**；GrainSilo 软件采用定制非商业许可，并非 OSI 标准开源许可证。硬件接线资料按单独声明的范围采用 CC BY 4.0。
+> GrainSilo 软件和固件采用 Apache-2.0。仓库包含 Windows 本地中心站、S3/C3 固件和随固件构建的 AutoLink 库。[AutoLink 独立仓库](https://github.com/sun2006-xin/autolink)提供协议规范与冻结基线。指定硬件接线资料采用 CC BY 4.0。
 
 ## 项目简介
 
-GrainSilo 是一套面向教学、个人学习与非商业研究的粮仓温湿度监测原型。当前实物为 **1 根探杆、3 个 ESP32-C3 / MAX3485 / SHT31 测量节点和 1 个 ESP32-S3 主机**。每个测量节点的 C3、RS-485 收发器与温湿度传感器集成在同一块小电路板中，安装于长而光滑的探杆结构内；不是外挂方盒或三根独立探针。
+GrainSilo 是一套粮仓温湿度监测原型。设计方案为 **1 根探杆、3 个 ESP32-C3 / MAX3485 / SHT31 测量节点和 1 个 ESP32-S3 主机**。测量节点采用集成小电路板方案，当前实验使用桌面原型。
 
 节点测得的是探杆周围空气的温度和相对湿度（%RH），不是粮食含水率。S3 汇总节点数据后，通过 Wi-Fi 主动上报到同一可信局域网中的 Windows 本地中心站；电脑端使用本地 SQLite 保存历史记录。
 
@@ -28,7 +29,7 @@ GrainSilo 是一套面向教学、个人学习与非商业研究的粮仓温湿�
 
 测量节点（ESP32-C3、MAX3485、SHT31）→ RS-485 总线 → ESP32-S3 主机 → Wi-Fi 可信局域网 → Windows 本地中心站与 SQLite。节点本地 I²C/UART 连接不属于 RS-485 四芯主干；四芯主干为 A、B、VCC、GND。
 
-预测使用一份共享模型：Station 从本地历史训练并按版本发送参数，S3 与 Windows 使用相同的模型输入/输出约定。网页把候选值与已采用值分开展示；未通过时间留出验证的候选值不参与告警或采样控制。
+Windows 中心站提供温湿度预测和历史评估，S3 固件提供设备端趋势估计。
 
 ## 硬件连接
 
@@ -63,9 +64,9 @@ GrainSilo 是一套面向教学、个人学习与非商业研究的粮仓温湿�
 
 ## 温湿度预测与告警
 
-预测对象是探杆周围空气的温度与相对湿度，不是粮食含水率，也不代表整堆实测温度场或 CFD 仿真。Windows Station 使用已有的节点历史训练一份轻量 MLP，并向 S3 同步版本化参数；电脑端与设备端按同一特征/输出契约运行。当前天气只在有新鲜网格天气时作为输入，天气不是仓内实测。
+预测对象是探杆周围空气的温度与相对湿度。Windows Station 可以用历史节点数据训练轻量 MLP，并在天气数据可用时使用室外网格天气作为辅助输入。S3 本地趋势估计使用设备端样本。
 
-两端页面分别展示模型候选值和当前采用值。候选输出只有在按时间留出的验证不劣于持续性基线后，才可进入预测告警或 S3 采样/上报节奏；未验证输出仅供观察，采用值回退为持续性基线。当前历史回放尚未证明学习模型优于该基线，因此不得把候选结果描述为已达到预测精度或用于粮食安全决策。模型的版本更新与边界见 [更新记录](CHANGELOG.md)。
+中心站用按时间留出的数据比较模型候选值与持续性基线。当前候选输出用于观察。模型版本和历史变更见 [更新记录](CHANGELOG.md)。
 
 ## 下载并启动电脑端
 
@@ -79,7 +80,7 @@ GrainSilo 是一套面向教学、个人学习与非商业研究的粮仓温湿�
 
 ## 固件与 AutoLink 边界
 
-仓库内的 firmware 目录包含 GrainSilo 的 S3/C3 应用集成源码，但不含 AutoLink 协议库、协议实现或完整协议资料。因此电脑中心站可单独运行；**仅克隆本仓库不能独立编译 S3/C3 固件**。不得把应用侧依赖调用误称为 AutoLink 协议开放。详见[AutoLink 集成边界](docs/AutoLink集成边界.md)。
+`firmware/` 包含 S3/C3 应用源码、ESP32 适配和随项目分发的 AutoLinkCore、GSProto。固件编译方式和 GrainSilo 的四项集成补丁见 [AutoLink 集成说明](docs/AutoLink集成边界.md)。Windows 中心站可以独立运行。
 
 ## 安全与隐私
 
@@ -89,7 +90,7 @@ S3 配网热点目前没有密码；S3 设备网页与电脑中心站当前均�
 
 ## 许可与署名
 
-- **软件与固件应用源码**：适用根目录 LICENSE 中的定制非商业许可。个人学习、教学和非商业研究可按条款使用；商业资助集成、企业部署、销售及收费服务须事先取得权利人书面授权。该许可不属于 OSI 标准开源许可。
+- **软件与固件**按 [Apache-2.0](LICENSE) 发布，允许依照许可证条款商用。
 - **硬件结构与接线资料**：仅 docs/系统架构与硬件连接.md 及 docs/images/hardware-connection.png 中的原创硬件资料采用 CC BY 4.0，使用时须署名“花鱼鱼”、附许可链接并说明修改。该许可不覆盖软件、AutoLink、品牌或未明确授予的专利权。
 - **项目品牌与其余宣传 / 概念图片**：不因本仓库公开而获得额外商标、背书或商业使用许可；除硬件接线图明确授予的范围外，相关图片权利由权利人保留。
 - 第三方代码、组件和数据服务继续适用各自的许可与条款，见[第三方组件与外部服务说明](docs/第三方组件许可证说明.md)。

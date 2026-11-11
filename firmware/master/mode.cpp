@@ -32,6 +32,14 @@ void mode_init(void)
     /* BOOT 键长按检测 */
     bool held = false;
     pinMode(PIN_BOOT, INPUT_PULLUP);
+    /* DEBUG is already the destination mode; waiting here only delays RS-485
+     * initialization and cannot change the selected mode. */
+    if (s_mode == MODE_DEBUG) {
+        held = digitalRead(PIN_BOOT) == LOW;
+        Serial.printf("[MODE] mode=%s key_held=%d key_check=skipped\n",
+                      mode_name(s_mode), held);
+        return;
+    }
     uint32_t t0 = millis();
     while ((uint32_t)(millis() - t0) < KEY_HOLD_MS) {
         if (digitalRead(PIN_BOOT) == LOW) {

@@ -1,17 +1,14 @@
-# AutoLink 协议开放状态与集成边界
+# AutoLink 集成说明
 
-## 归属与发布边界
+GrainSilo 随固件源码提供 `firmware/libraries/AutoLinkCore` 和 `firmware/libraries/GSProto`，两库基于 [AutoLink v2.2.0](https://github.com/sun2006-xin/autolink/tree/v2.2.0)。GrainSilo 的 Master 叠加采样接口、READ_INFO 调度、离线回访和传感器错误应答四项集成改动。随附库已经包含这些改动。
 
-AutoLink 是项目所有者自研的协议/框架，相关权利由权利人保留，**目前暂不开源**。本仓库不包含 AutoLink 源码、协议头文件、编译库、协议文档、内部补丁或完整 API 清单。GrainSilo 源码中的依赖调用仅说明应用与私有依赖之间存在集成关系，不构成协议实现或使用授权。
+使用 Espressif Arduino ESP32 core 3.3.10。S3 OLED 需要 Adafruit SSD1306、Adafruit GFX Library 和 Adafruit BusIO。使用 Arduino IDE 时，把两个随附库目录安装到 Arduino 用户库目录，并确认 IDE 选择的是本仓库提供的版本。
 
-## GrainSilo 所需的集成能力
+从仓库根目录运行以下 Arduino CLI 构建命令。S3 的 Flash 和 PSRAM 选项按实际模组选取。
 
-S3/C3 应用源码保留必要的集成调用，但本文件不列出 API 清单、帧格式、功能码、编码/校验规则、交易时序、状态机或持久化布局。完整协议资料和实现继续保存在项目所有者的私有工程中，不进入本仓库。
+```text
+arduino-cli compile --fqbn esp32:esp32:esp32s3 --library firmware/libraries/AutoLinkCore --library firmware/libraries/GSProto firmware/master
+arduino-cli compile --fqbn esp32:esp32:esp32c3 --library firmware/libraries/AutoLinkCore --library firmware/libraries/GSProto firmware/node
+```
 
-## 固件构建限制
-
-电脑端 station/ 可独立运行。固件源码需要兼容的 Arduino/ESP32 工具链，以及项目所有者另行授权提供的 AutoLink 私有依赖和配套适配。因此 firmware/master 和 firmware/node 是 GrainSilo 业务/集成源码，不是可独立构建的固件发行版。不得宣传为“克隆后即可编译固件”。
-
-## 权利告示
-
-本仓库明确说明“AutoLink 协议暂不开源”。根目录 LICENSE 只覆盖其中明确列出的 GrainSilo 软件文件，不授权 AutoLink 的复制、使用、修改或再分发。今后是否开放 AutoLink，需项目所有者另行决定；本文件不构成开放承诺。
+AutoLink 管理 RS-485 通信。ESP32 适配层连接 UART、计时和持久化。Windows 中心站通过局域网接收 S3 上报，可以独立运行。

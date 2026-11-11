@@ -234,12 +234,18 @@ static void render(void)
 
 void oled_init(void)
 {
+    Serial.println("[BOOTDIAG] build=GS-20261010-MASTER-FIX1 stage=oled-wire-begin");
+    Serial0.println("[BOOTDIAG] build=GS-20261010-MASTER-FIX1 stage=oled-wire-begin");
     Wire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
     Wire.setClock(OLED_I2C_CLOCK_HZ);
     Wire.setTimeOut(25u);
     analogSetPinAttenuation(OLED_BAT_GPIO, ADC_11db);
     s_last_probe_ms = now_ms();
     s_ok = init_panel();
+    Serial.printf("[BOOTDIAG] build=GS-20261010-MASTER-FIX1 stage=oled-panel-init ready=%u i2c_addr=0x%02X\n",
+                  s_ok ? 1u : 0u, (unsigned)OLED_I2C_ADDR);
+    Serial0.printf("[BOOTDIAG] build=GS-20261010-MASTER-FIX1 stage=oled-panel-init ready=%u i2c_addr=0x%02X\n",
+                   s_ok ? 1u : 0u, (unsigned)OLED_I2C_ADDR);
     s_panel_seen = s_ok;
     if (s_ok) {
         Serial.println("[OLED] SSD1306 ready at 0x3C");

@@ -7,7 +7,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "unified_forecast_model.h"
 
 typedef struct {
     bool present;
@@ -18,20 +17,18 @@ typedef struct {
     int32_t rh_low_centi;
     uint32_t normal_interval_sec;
     uint32_t fast_interval_sec;
-    bool forecast_model_present;
-    uint32_t forecast_model_version;
-    uint8_t forecast_validated_mask;
-    float forecast_parameters[GS_UF_PARAMETER_COUNT];
-    bool forecast_weather_present;
-    uint32_t forecast_weather_age_sec;
-    float forecast_weather_temperature_c;
-    float forecast_weather_rh_pct;
 } net_remote_settings_t;
 
 /* 读 NVS WiFi 配置（无配置用编译默认值） */
 void net_init(void);
 
-/* 连接 WiFi；返回是否成功（循环内喂看门狗） */
+/* 只启动 WiFi 关联，不等待；可在启动路径调用。 */
+void net_connect_start(void);
+
+/* 主循环中的非阻塞连接超时与 AP 回退维护。 */
+void net_service(void);
+
+/* 等待 WiFi 连接；仅供后台上报任务调用，不要放在 setup/loop。 */
 bool net_connect(uint32_t timeoutMs);
 
 /* POST 快照；读取一次性 cmd 与可重试的版本化设备设置。 */

@@ -182,7 +182,6 @@ bool alarm_apply_remote_config(uint32_t revision, int32_t temp_high_centi,
                                uint32_t fast_interval_sec)
 {
     if (revision == 0u) return false;
-    if (revision == s_remote_config_revision) return true;
     if (revision < s_remote_config_revision) return false;
     if (temp_low_centi < -4000 || temp_high_centi > 8000 ||
         temp_low_centi >= temp_high_centi || rh_low_centi < 0 ||
@@ -199,22 +198,35 @@ bool alarm_apply_remote_config(uint32_t revision, int32_t temp_high_centi,
     next.normalIntervalMs = normal_interval_sec * 1000u;
     next.fastIntervalMs = fast_interval_sec * 1000u;
 
-    uint8_t buf[sizeof(alarm_cfg_t) + 1];
-    memcpy(buf, &next, sizeof(alarm_cfg_t));
-    buf[sizeof(alarm_cfg_t)] = crc8(buf, sizeof(alarm_cfg_t));
-    Preferences p;
-    if (!p.begin(NVS_NS, false)) return false;
-    const size_t written = p.putBytes(NVS_KEY_CFG, buf, sizeof(buf));
-    p.end();
-    if (written != sizeof(buf)) return false;
+    const bool config_changed =
+        s_cfg.tempHigh != next.tempHigh || s_cfg.tempLow != next.tempLow ||
+        s_cfg.rhHigh != next.rhHigh || s_cfg.rhLow != next.rhLow ||
+        s_cfg.normalIntervalMs != next.normalIntervalMs ||
+        s_cfg.fastIntervalMs != next.fastIntervalMs;
+    const bool revision_changed = revision > s_remote_config_revision;
+    if (!config_changed && !revision_changed) return true;
 
-    /* Config bytes are durable before the revision marker. If power is lost
-       between writes, Station retries the same idempotent revision on next POST. */
-    s_cfg = next;
-    if (!p.begin(NVS_NS, false)) return false;
-    const size_t revision_written = p.putUInt(NVS_KEY_REMOTE_REV, revision);
-    p.end();
-    if (revision_written != sizeof(revision)) return false;
+    if (config_changed) {
+        uint8_t buf[sizeof(alarm_cfg_t) + 1];
+        memcpy(buf, &next, sizeof(alarm_cfg_t));
+        buf[sizeof(alarm_cfg_t)] = crc8(buf, sizeof(alarm_cfg_t));
+        Preferences p;
+        if (!p.begin(NVS_NS, false)) return false;
+        const size_t written = p.putBytes(NVS_KEY_CFG, buf, sizeof(buf));
+        p.end();
+        if (written != sizeof(buf)) return false;
+        s_cfg = next;
+    }
+
+    if (revision_changed) {
+        /* Config bytes are durable before the revision marker. If power is lost
+           between writes, Station retries the idempotent revision on next POST. */
+        Preferences p;
+        if (!p.begin(NVS_NS, false)) return false;
+        const size_t revision_written = p.putUInt(NVS_KEY_REMOTE_REV, revision);
+        p.end();
+        if (revision_written != sizeof(revision)) return false;
+    }
 
     s_remote_config_revision = revision;
     Serial.printf("[ALARM] remote config applied revision=%lu poll=%lus fast=%lus\n",

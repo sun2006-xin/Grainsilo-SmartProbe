@@ -14,8 +14,8 @@ typedef struct {
     int32_t  tempLow;         /* 0.01C，默认 -500 = -5.00C */
     int32_t  rhHigh;          /* 0.01%RH，默认 7000 = 70%RH，0=不启用 */
     int32_t  rhLow;           /* 0.01%RH，默认 0 = 不启用 */
-    uint32_t normalIntervalMs; /* 常规采集/上报周期；LOWPOWER 默认 900000 */
-    uint32_t fastIntervalMs;   /* 风险采集/上报周期；LOWPOWER 默认 60000 */
+    uint32_t normalIntervalMs; /* 常规单节点目标周期；LOWPOWER 默认 900000 */
+    uint32_t fastIntervalMs;   /* 风险单节点目标周期；LOWPOWER 默认 60000 */
     uint8_t  triggerCnt;       /* 连续超限轮数 -> 进入 FAST，默认 2 */
     uint8_t  recoverCnt;       /* 连续正常轮数 -> 恢复 NORMAL，默认 3 */
 } alarm_cfg_t;
